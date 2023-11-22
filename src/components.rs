@@ -1,25 +1,20 @@
 use macroquad::math::Vec2;
-use macroquad::prelude::Texture2D;
+use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Position {
-    pub position: Vec2
+pub struct DrawableComponent {
+    pub texture_id: Uuid,
+    pub position: Vec2,
+    pub rotation: f32
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Velocity {
+pub struct VelocityComponent {
     pub velocity: Vec2
 }
 
-#[derive(Clone, Debug, Copy, PartialEq)]
-pub struct Texture {
-    pub texture_id: i32
-}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PlayerComponent;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Rotation {
-    pub  rotation: f32
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Player;
+pub struct AsteroidComponent;

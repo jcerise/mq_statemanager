@@ -1,13 +1,18 @@
-use std::borrow::Borrow;
 mod input;
 mod components;
 mod systems;
 
+extern crate rand;
+
 use std::collections::HashMap;
-use legion::{IntoQuery, Read, Schedule, World};
+use legion::{IntoQuery, Resources, Schedule, World};
 use macroquad::prelude::*;
-use crate::components::{Player, Position, Rotation, Texture, Velocity};
+use macroquad::rand::ChooseRandom;
+use rand::Rng;
+use uuid::Uuid;
+use crate::components::{AsteroidComponent, DrawableComponent, PlayerComponent, VelocityComponent};
 use crate::input::{ControlSet, GamePlayControls, InputManaged, InputManager, MainMenuControls};
+use crate::systems::{apply_velocity_system, rotate_asteroids_system};
 
 #[derive(Clone)]
 enum GameState {
@@ -34,6 +39,7 @@ struct GameStateManager {
     previous_state: GameState,
     active_controls: Box<dyn ControlSet>,
     pub world: World,
+    pub resources: Resources,
 }
 
 impl GameStateManager {
@@ -51,7 +57,12 @@ impl GameStateManager {
 struct RenderData {
     position: Vec2,
     rotation: f32,
-    texture: i32,
+    texture: Uuid,
+}
+
+pub struct ScreenDimensions {
+    width: f32,
+    height: f32,
 }
 
 fn conf() -> Conf {
@@ -67,20 +78,52 @@ fn conf() -> Conf {
 async fn main() {
 
     let mut texture_assets = HashMap::new();
+    let mut rng = rand::thread_rng();
 
-    // Load our player texture
+    // Load our textures
     let ship_texture: Texture2D = load_texture("resources/ship.png").await.unwrap();
+    let large_asteroid_texture_1: Texture2D = load_texture("resources/asteroid_2.png").await.unwrap();
+    let large_asteroid_texture_2: Texture2D = load_texture("resources/asteroid_3.png").await.unwrap();
+    let large_asteroid_texture_3: Texture2D = load_texture("resources/asteroid_4.png").await.unwrap();
 
-    texture_assets.insert(1, ship_texture);
+    let ship_texture_id = Uuid::new_v4();
+    let large_asteroid1_texture_id = Uuid::new_v4();
+    let large_asteroid2_texture_id = Uuid::new_v4();
+    let large_asteroid3_texture_id = Uuid::new_v4();
+
+    texture_assets.insert(ship_texture_id, ship_texture);
+    texture_assets.insert(large_asteroid1_texture_id, large_asteroid_texture_1);
+    texture_assets.insert(large_asteroid2_texture_id, large_asteroid_texture_2);
+    texture_assets.insert(large_asteroid3_texture_id, large_asteroid_texture_3);
+
+    // Add the large asteroid textures to a vector, so we can randomly choose one each time we
+    // instantiate a new large asteroid
+    let mut large_asteroid_textures: Vec<Uuid> = Vec::new();
+    large_asteroid_textures.push(large_asteroid1_texture_id);
+    large_asteroid_textures.push(large_asteroid2_texture_id);
+    large_asteroid_textures.push(large_asteroid3_texture_id);
 
     // Create our legion world
     let mut world = World::default();
+    let mut resources = Resources::default();
+    resources.insert(ScreenDimensions{width: screen_width(), height: screen_height()});
 
     // Load our player entity into the world
     let ship_position = Vec2::new(screen_width() / 2., screen_height() / 2.);
     world.push(
-        (Player, Texture{texture_id: 1}, Position{position: ship_position}, Velocity{velocity: Vec2::new(0.0, 0.0)}, Rotation{rotation: 0.0})
+        (PlayerComponent, DrawableComponent{texture_id: ship_texture_id, position: ship_position, rotation: 0.0}, VelocityComponent{velocity: Vec2::new(0.0, 0.0)})
     );
+
+    // Add eight large asteroids, and set them moving in random directions, at random velocity
+    for _ in 0..8 {
+        let rotation = rng.gen_range(-10.0..=10.0);
+        let pos = Vec2::new(rng.gen_range(0.0..=screen_width()), rng.gen_range(0.0..=screen_height()));
+        let tex_uuid = large_asteroid_textures.choose().unwrap();
+
+        world.push(
+            (AsteroidComponent, DrawableComponent{texture_id: *tex_uuid, position: pos, rotation: rotation}, VelocityComponent{velocity: Vec2::from_angle(rotation) * rng.gen_range(0.1..=1.0)})
+        );
+    }
 
     // Init our game manager to the main menu state, the previous state will also reflect this
     let mut game_manager = GameStateManager{
@@ -88,9 +131,15 @@ async fn main() {
         previous_state: GameState::MainMenu,
         active_controls: GameState::MainMenu.value(),
         world,
+        resources,
     };
 
     let mut input_manager = InputManager{};
+
+    let mut schedule = Schedule::builder()
+        .add_system(apply_velocity_system())
+        .add_system(rotate_asteroids_system())
+        .build();
 
     loop {
         clear_background(BLACK);
@@ -127,13 +176,16 @@ async fn main() {
                     });
             }
             GameState::GamePlay => {
+                // Execute all systems
+                schedule.execute(&mut game_manager.world, &mut game_manager.resources);
+
                 let mut render_data = Vec::new();
-                let mut query = <(&Position, &Rotation, &Texture)>::query();
-                for (position, rotation, texture) in query.iter(&game_manager.world) {
+                let mut query = <&DrawableComponent>::query();
+                for drawable in query.iter(&game_manager.world) {
                     render_data.push(RenderData {
-                        position: position.position.clone(),
-                        rotation: rotation.rotation.clone(),
-                        texture: texture.texture_id.clone()
+                        position: drawable.position.clone(),
+                        rotation: drawable.rotation.clone(),
+                        texture: drawable.texture_id.clone()
                     });
                 }
 
@@ -143,7 +195,7 @@ async fn main() {
                         ..Default::default()
                     };
 
-                    draw_texture_ex(&texture_assets.get(1_i32.borrow()).unwrap(), data.position.x, data.position.y, WHITE, draw_params);
+                    draw_texture_ex(&texture_assets.get(&data.texture).unwrap(), data.position.x, data.position.y, WHITE, draw_params);
                 }
             }
             GameState::Pause => {}

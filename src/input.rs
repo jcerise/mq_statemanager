@@ -1,7 +1,8 @@
 use legion::{IntoQuery, Read, World, Write};
 use macroquad::input::{is_key_down, KeyCode};
+use macroquad::math::Vec2;
 use crate::{GameState};
-use crate::components::{Player, Rotation};
+use crate::components::{DrawableComponent, PlayerComponent, VelocityComponent};
 
 pub trait InputManaged {
     fn map_input(&mut self) -> Action;
@@ -16,6 +17,7 @@ pub enum Action {
     Revert,
     RotateShipRight,
     RotateShipLeft,
+    ThrustShip,
     NoOp,
 }
 
@@ -36,11 +38,15 @@ impl InputManaged for InputManager {
         if is_key_down(KeyCode::Right) {
             key_code = KeyCode::Right
         }
+        if is_key_down(KeyCode::Up) {
+            key_code = KeyCode::Up
+        }
         match key_code {
             KeyCode::Enter => Action::Confirm,
             KeyCode::Escape => Action::Revert,
             KeyCode::Right => Action::RotateShipRight,
             KeyCode::Left => Action::RotateShipLeft,
+            KeyCode::Up => Action::ThrustShip,
             _ => Action::NoOp,
         }
     }
@@ -68,16 +74,24 @@ impl ControlSet for GamePlayControls {
                 Some(GameState::MainMenu)
             },
             Action::RotateShipRight => {
-                let mut query = <(Write<Rotation>, Read<Player>)>::query();
-                for (rotation, _) in query.iter_mut(world) {
-                    rotation.rotation += 0.1;
+                let mut query = <(Write<DrawableComponent>, Read<PlayerComponent>)>::query();
+                for (drawable, _) in query.iter_mut(world) {
+                    drawable.rotation += 0.1;
                 }
                 None
             },
             Action::RotateShipLeft => {
-                let mut query = <(Write<Rotation>, Read<Player>)>::query();
-                for (rotation, _) in query.iter_mut(world) {
-                    rotation.rotation -= 0.1;
+                let mut query = <(Write<DrawableComponent>, Read<PlayerComponent>)>::query();
+                for (drawable, _) in query.iter_mut(world) {
+                    drawable.rotation -= 0.1;
+                }
+                None
+            },
+            Action::ThrustShip => {
+                let mut query = <(Write<VelocityComponent>, Read<DrawableComponent>, Read<PlayerComponent>)>::query();
+                for (velocity, drawable, _) in query.iter_mut(world) {
+                    let acceleration = Vec2::from_angle(drawable.rotation) * 0.1;
+                    velocity.velocity += acceleration;
                 }
                 None
             }
