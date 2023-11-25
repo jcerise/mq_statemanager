@@ -82,16 +82,19 @@ async fn main() {
 
     // Load our textures
     let ship_texture: Texture2D = load_texture("resources/ship.png").await.unwrap();
+    let bullet_texture: Texture2D = load_texture("resources/bullet.png").await.unwrap();
     let large_asteroid_texture_1: Texture2D = load_texture("resources/asteroid_2.png").await.unwrap();
     let large_asteroid_texture_2: Texture2D = load_texture("resources/asteroid_3.png").await.unwrap();
     let large_asteroid_texture_3: Texture2D = load_texture("resources/asteroid_4.png").await.unwrap();
 
     let ship_texture_id = Uuid::new_v4();
+    let bullet_texture_id = Uuid::new_v4();
     let large_asteroid1_texture_id = Uuid::new_v4();
     let large_asteroid2_texture_id = Uuid::new_v4();
     let large_asteroid3_texture_id = Uuid::new_v4();
 
     texture_assets.insert(ship_texture_id, ship_texture);
+    texture_assets.insert(bullet_texture_id, bullet_texture);
     texture_assets.insert(large_asteroid1_texture_id, large_asteroid_texture_1);
     texture_assets.insert(large_asteroid2_texture_id, large_asteroid_texture_2);
     texture_assets.insert(large_asteroid3_texture_id, large_asteroid_texture_3);
@@ -145,10 +148,10 @@ async fn main() {
         clear_background(BLACK);
 
         // Grab any input that is present for this frame, and map it to a valid action, if any
-        let current_action = input_manager.map_input();
+        let current_actions = input_manager.map_input();
 
         // Handle the action for the current controlset. If an invalid action is provided, ignore
-        if let Some(new_state) = game_manager.active_controls.execute_action(current_action, &mut game_manager.world) {
+        if let Some(new_state) = game_manager.active_controls.execute_action(current_actions, &mut game_manager.world) {
             game_manager.update_state(new_state);
         }
 
