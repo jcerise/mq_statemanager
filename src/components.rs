@@ -14,7 +14,19 @@ pub struct VelocityComponent {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PlayerComponent;
+pub struct TimedExistenceComponent {
+    pub created_at: f64,
+    pub max_lifetime: f64
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PlayerComponent {
+    pub fire_rate: f64,
+    pub last_bullet_fired: f64
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AsteroidComponent;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BulletComponent;

@@ -12,7 +12,7 @@ use rand::Rng;
 use uuid::Uuid;
 use crate::components::{AsteroidComponent, DrawableComponent, PlayerComponent, VelocityComponent};
 use crate::input::{ControlSet, GamePlayControls, InputManaged, InputManager, MainMenuControls};
-use crate::systems::{apply_velocity_system, rotate_asteroids_system};
+use crate::systems::{apply_velocity_system, destroy_timed_entities_system, rotate_asteroids_system};
 
 #[derive(Clone)]
 enum GameState {
@@ -65,6 +65,15 @@ pub struct ScreenDimensions {
     height: f32,
 }
 
+pub struct TimeResource {
+    absolute_time: f64
+}
+
+#[derive(Clone)]
+pub struct TextureMap {
+    mapping: HashMap<String, Uuid>
+}
+
 fn conf() -> Conf {
     Conf {
         window_title: "MQ GameState".to_string(),
@@ -78,6 +87,7 @@ fn conf() -> Conf {
 async fn main() {
 
     let mut texture_assets = HashMap::new();
+    let mut texture_map: TextureMap  = TextureMap{mapping: HashMap::new()};
     let mut rng = rand::thread_rng();
 
     // Load our textures
@@ -92,6 +102,12 @@ async fn main() {
     let large_asteroid1_texture_id = Uuid::new_v4();
     let large_asteroid2_texture_id = Uuid::new_v4();
     let large_asteroid3_texture_id = Uuid::new_v4();
+
+    texture_map.mapping.insert("ship".to_string(), ship_texture_id);
+    texture_map.mapping.insert("bullet".to_string(), bullet_texture_id);
+    texture_map.mapping.insert("large_asteroid_1".to_string(), large_asteroid1_texture_id);
+    texture_map.mapping.insert("large_asteroid_2".to_string(), large_asteroid2_texture_id);
+    texture_map.mapping.insert("large_asteroid_3".to_string(), large_asteroid3_texture_id);
 
     texture_assets.insert(ship_texture_id, ship_texture);
     texture_assets.insert(bullet_texture_id, bullet_texture);
@@ -110,11 +126,17 @@ async fn main() {
     let mut world = World::default();
     let mut resources = Resources::default();
     resources.insert(ScreenDimensions{width: screen_width(), height: screen_height()});
+    resources.insert(texture_map.clone());
+    resources.insert(TimeResource{absolute_time: get_time()});
 
     // Load our player entity into the world
     let ship_position = Vec2::new(screen_width() / 2., screen_height() / 2.);
     world.push(
-        (PlayerComponent, DrawableComponent{texture_id: ship_texture_id, position: ship_position, rotation: 0.0}, VelocityComponent{velocity: Vec2::new(0.0, 0.0)})
+        (
+            PlayerComponent{last_bullet_fired: 0.0, fire_rate: 0.2},
+            DrawableComponent{texture_id: ship_texture_id, position: ship_position, rotation: 0.0},
+            VelocityComponent{velocity: Vec2::new(0.0, 0.0)}
+        )
     );
 
     // Add eight large asteroids, and set them moving in random directions, at random velocity
@@ -142,16 +164,20 @@ async fn main() {
     let mut schedule = Schedule::builder()
         .add_system(apply_velocity_system())
         .add_system(rotate_asteroids_system())
+        .add_system(destroy_timed_entities_system())
         .build();
 
     loop {
         clear_background(BLACK);
 
+        game_manager.resources.remove::<TimeResource>();
+        game_manager.resources.insert(TimeResource{absolute_time:get_time()});
+
         // Grab any input that is present for this frame, and map it to a valid action, if any
         let current_actions = input_manager.map_input();
 
         // Handle the action for the current controlset. If an invalid action is provided, ignore
-        if let Some(new_state) = game_manager.active_controls.execute_action(current_actions, &mut game_manager.world) {
+        if let Some(new_state) = game_manager.active_controls.execute_action(current_actions, &mut game_manager.world, &texture_map) {
             game_manager.update_state(new_state);
         }
 

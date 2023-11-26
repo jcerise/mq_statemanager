@@ -1,15 +1,18 @@
-use legion::{IntoQuery, Read, World, Write};
+use std::future::pending;
+use legion::{IntoQuery, Read, Resources, World, Write};
+use legion::storage::Component;
 use macroquad::input::{is_key_down, KeyCode};
 use macroquad::math::Vec2;
-use crate::{GameState};
-use crate::components::{DrawableComponent, PlayerComponent, VelocityComponent};
+use macroquad::time::get_time;
+use crate::{GameState, TextureMap};
+use crate::components::{BulletComponent, DrawableComponent, PlayerComponent, TimedExistenceComponent, VelocityComponent};
 
 pub trait InputManaged {
     fn map_input(&mut self) -> Vec<Action>;
 }
 
 pub(crate) trait ControlSet {
-    fn execute_action(&mut self, actions: Vec<Action>, world: &mut World) -> Option<GameState>;
+    fn execute_action(&mut self, actions: Vec<Action>, world: &mut World, texture_map: &TextureMap) -> Option<GameState>;
 }
 
 pub enum Action {
@@ -45,6 +48,9 @@ impl InputManaged for InputManager {
         if is_key_down(KeyCode::Up) {
             keys.push(KeyCode::Up)
         }
+        if is_key_down(KeyCode::Space) {
+            keys.push(KeyCode::Space)
+        }
 
         let mut actions: Vec<Action> = Vec::new();
         for key_code in keys.iter(){
@@ -54,6 +60,7 @@ impl InputManaged for InputManager {
                 KeyCode::Right => actions.push(Action::RotateShipRight),
                 KeyCode::Left => actions.push(Action::RotateShipLeft),
                 KeyCode::Up => actions.push(Action::ThrustShip),
+                KeyCode::Space => actions.push(Action::FireBullet),
                 _ => actions.push(Action::NoOp),
             }
         }
@@ -64,7 +71,7 @@ impl InputManaged for InputManager {
 pub struct MainMenuControls;
 
 impl ControlSet for MainMenuControls {
-    fn execute_action(&mut self, actions: Vec<Action>, world: &mut World) -> Option<GameState> {
+    fn execute_action(&mut self, actions: Vec<Action>, world: &mut World, texture_map: &TextureMap) -> Option<GameState> {
         for action in actions.iter() {
             match action {
                 Action::Confirm => {
@@ -80,25 +87,24 @@ impl ControlSet for MainMenuControls {
 pub struct GamePlayControls;
 
 impl ControlSet for GamePlayControls {
-    fn execute_action(&mut self, actions: Vec<Action>, world: &mut World) -> Option<GameState>{
+    fn execute_action(&mut self, actions: Vec<Action>, world: &mut World, texture_map: &TextureMap) -> Option<GameState>{
+        let mut return_state: Option<GameState> = None;
         for action in actions.iter(){
             match action {
                 Action::Revert => {
-                    return Some(GameState::MainMenu)
+                    return_state = Some(GameState::MainMenu);
                 },
                 Action::RotateShipRight => {
                     let mut query = <(Write<DrawableComponent>, Read<PlayerComponent>)>::query();
                     for (drawable, _) in query.iter_mut(world) {
                         drawable.rotation += 0.1;
                     }
-                     return None
                 },
                 Action::RotateShipLeft => {
                     let mut query = <(Write<DrawableComponent>, Read<PlayerComponent>)>::query();
                     for (drawable, _) in query.iter_mut(world) {
                         drawable.rotation -= 0.1;
                     }
-                    return None
                 },
                 Action::ThrustShip => {
                     let mut query = <(Write<VelocityComponent>, Read<DrawableComponent>, Read<PlayerComponent>)>::query();
@@ -106,11 +112,41 @@ impl ControlSet for GamePlayControls {
                         let acceleration = Vec2::from_angle(drawable.rotation) * 0.1;
                         velocity.velocity += acceleration;
                     }
-                    return None
+                },
+                Action::FireBullet => {
+                    let frame_t = get_time();
+                    let mut query = <(Read<DrawableComponent>, Read<PlayerComponent>)>::query();
+                    let mut pending_entities = Vec::new();
+                    for (drawable, player) in query.iter_mut(world) {
+                        if frame_t - player.last_bullet_fired  > player.fire_rate {
+                            if let Some(bullet_texture_id) = texture_map.mapping.get("bullet") {
+                                pending_entities.push(
+                                    (
+                                        DrawableComponent{texture_id: *bullet_texture_id, position: drawable.position, rotation: 0.0},
+                                        VelocityComponent{velocity: Vec2::from_angle(drawable.rotation) * 15.},
+                                        TimedExistenceComponent{created_at: frame_t, max_lifetime: 1.0},
+                                        BulletComponent{},
+                                    )
+                                );
+                            }
+                        }
+                    }
+                    let mut bullet_fired = false;
+                    for pending_entity in pending_entities.iter() {
+                        bullet_fired = true;
+                        world.push((pending_entity.0.clone(), pending_entity.1.clone(), pending_entity.2.clone(), pending_entity.3.clone()));
+                    }
+                    if bullet_fired {
+                        let mut player_query = <Write<PlayerComponent>>::query();
+                        for player in player_query.iter_mut(world) {
+                            player.last_bullet_fired = frame_t;
+                        }
+                    }
+
                 }
-                _ =>  return None
+                _ =>  return_state = None
             }
         }
-        None
+        return_state
     }
 }
