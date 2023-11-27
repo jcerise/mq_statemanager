@@ -2,10 +2,10 @@ use std::future::pending;
 use legion::{IntoQuery, Read, Resources, World, Write};
 use legion::storage::Component;
 use macroquad::input::{is_key_down, KeyCode};
-use macroquad::math::Vec2;
+use macroquad::math::{Rect, Vec2};
 use macroquad::time::get_time;
 use crate::{GameState, TextureMap};
-use crate::components::{BulletComponent, DrawableComponent, PlayerComponent, TimedExistenceComponent, VelocityComponent};
+use crate::components::{BulletComponent, CollisionComponent, DrawableComponent, PlayerComponent, TimedExistenceComponent, VelocityComponent};
 
 pub trait InputManaged {
     fn map_input(&mut self) -> Vec<Action>;
@@ -126,6 +126,7 @@ impl ControlSet for GamePlayControls {
                                         VelocityComponent{velocity: Vec2::from_angle(drawable.rotation) * 15.},
                                         TimedExistenceComponent{created_at: frame_t, max_lifetime: 1.0},
                                         BulletComponent{},
+                                        CollisionComponent{rect: Rect::new(drawable.position[0], drawable.position[1], 16., 16.), collided: false}
                                     )
                                 );
                             }
@@ -134,7 +135,7 @@ impl ControlSet for GamePlayControls {
                     let mut bullet_fired = false;
                     for pending_entity in pending_entities.iter() {
                         bullet_fired = true;
-                        world.push((pending_entity.0.clone(), pending_entity.1.clone(), pending_entity.2.clone(), pending_entity.3.clone()));
+                        world.push((pending_entity.0.clone(), pending_entity.1.clone(), pending_entity.2.clone(), pending_entity.3.clone(), pending_entity.4.clone()));
                     }
                     if bullet_fired {
                         let mut player_query = <Write<PlayerComponent>>::query();

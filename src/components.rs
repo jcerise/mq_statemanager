@@ -1,4 +1,4 @@
-use macroquad::math::Vec2;
+use macroquad::math::{Rect, Vec2};
 use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -20,13 +20,21 @@ pub struct TimedExistenceComponent {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CollisionComponent {
+    pub rect: Rect,
+    pub collided: bool
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PlayerComponent {
     pub fire_rate: f64,
     pub last_bullet_fired: f64
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct AsteroidComponent;
+pub struct AsteroidComponent {
+    pub is_large: bool
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BulletComponent;

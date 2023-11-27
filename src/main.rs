@@ -10,9 +10,9 @@ use macroquad::prelude::*;
 use macroquad::rand::ChooseRandom;
 use rand::Rng;
 use uuid::Uuid;
-use crate::components::{AsteroidComponent, DrawableComponent, PlayerComponent, VelocityComponent};
+use crate::components::{AsteroidComponent, CollisionComponent, DrawableComponent, PlayerComponent, VelocityComponent};
 use crate::input::{ControlSet, GamePlayControls, InputManaged, InputManager, MainMenuControls};
-use crate::systems::{apply_velocity_system, destroy_timed_entities_system, rotate_asteroids_system};
+use crate::systems::{apply_velocity_system, destroy_timed_entities_system, handle_bullet_collisions_system, rotate_asteroids_system, test_system};
 
 #[derive(Clone)]
 enum GameState {
@@ -96,24 +96,28 @@ async fn main() {
     let large_asteroid_texture_1: Texture2D = load_texture("resources/asteroid_2.png").await.unwrap();
     let large_asteroid_texture_2: Texture2D = load_texture("resources/asteroid_3.png").await.unwrap();
     let large_asteroid_texture_3: Texture2D = load_texture("resources/asteroid_4.png").await.unwrap();
+    let small_asteroid_texture: Texture2D = load_texture("resources/small_asteroid.png").await.unwrap();
 
     let ship_texture_id = Uuid::new_v4();
     let bullet_texture_id = Uuid::new_v4();
     let large_asteroid1_texture_id = Uuid::new_v4();
     let large_asteroid2_texture_id = Uuid::new_v4();
     let large_asteroid3_texture_id = Uuid::new_v4();
+    let small_asteroid_texture_id = Uuid::new_v4();
 
     texture_map.mapping.insert("ship".to_string(), ship_texture_id);
     texture_map.mapping.insert("bullet".to_string(), bullet_texture_id);
     texture_map.mapping.insert("large_asteroid_1".to_string(), large_asteroid1_texture_id);
     texture_map.mapping.insert("large_asteroid_2".to_string(), large_asteroid2_texture_id);
     texture_map.mapping.insert("large_asteroid_3".to_string(), large_asteroid3_texture_id);
+    texture_map.mapping.insert("small_asteroid".to_string(), small_asteroid_texture_id);
 
     texture_assets.insert(ship_texture_id, ship_texture);
     texture_assets.insert(bullet_texture_id, bullet_texture);
     texture_assets.insert(large_asteroid1_texture_id, large_asteroid_texture_1);
     texture_assets.insert(large_asteroid2_texture_id, large_asteroid_texture_2);
     texture_assets.insert(large_asteroid3_texture_id, large_asteroid_texture_3);
+    texture_assets.insert(small_asteroid_texture_id, small_asteroid_texture);
 
     // Add the large asteroid textures to a vector, so we can randomly choose one each time we
     // instantiate a new large asteroid
@@ -135,7 +139,8 @@ async fn main() {
         (
             PlayerComponent{last_bullet_fired: 0.0, fire_rate: 0.2},
             DrawableComponent{texture_id: ship_texture_id, position: ship_position, rotation: 0.0},
-            VelocityComponent{velocity: Vec2::new(0.0, 0.0)}
+            VelocityComponent{velocity: Vec2::new(0.0, 0.0)},
+            CollisionComponent{rect: Rect::new(ship_position[0], ship_position[1], 16., 16.), collided: false},
         )
     );
 
@@ -146,7 +151,12 @@ async fn main() {
         let tex_uuid = large_asteroid_textures.choose().unwrap();
 
         world.push(
-            (AsteroidComponent, DrawableComponent{texture_id: *tex_uuid, position: pos, rotation: rotation}, VelocityComponent{velocity: Vec2::from_angle(rotation) * rng.gen_range(0.1..=1.0)})
+            (
+                AsteroidComponent{is_large: true},
+                DrawableComponent{texture_id: *tex_uuid, position: pos, rotation: rotation},
+                VelocityComponent{velocity: Vec2::from_angle(rotation) * rng.gen_range(0.1..=1.0)},
+                CollisionComponent{rect: Rect::new(pos[0], pos[1], 16., 16.), collided: false},
+            )
         );
     }
 
@@ -165,6 +175,7 @@ async fn main() {
         .add_system(apply_velocity_system())
         .add_system(rotate_asteroids_system())
         .add_system(destroy_timed_entities_system())
+        .add_system(handle_bullet_collisions_system())
         .build();
 
     loop {
