@@ -1,6 +1,4 @@
-use std::future::pending;
-use legion::{IntoQuery, Read, Resources, World, Write};
-use legion::storage::Component;
+use legion::{IntoQuery, Read, World, Write};
 use macroquad::input::{is_key_down, KeyCode};
 use macroquad::math::{Rect, Vec2};
 use macroquad::time::get_time;
@@ -32,7 +30,6 @@ impl InputManaged for InputManager {
         // Keep track of multiple actions, as multiple keys can be pressed at the same time
         let mut keys: Vec<KeyCode> = Vec::new();
 
-        let mut key_code = KeyCode::Unknown;
         if is_key_down(KeyCode::Enter) {
             keys.push(KeyCode::Enter)
         }

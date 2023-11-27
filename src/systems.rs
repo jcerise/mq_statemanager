@@ -33,7 +33,7 @@ pub fn apply_velocity(velocity: &mut VelocityComponent,
             drawable.position.y = screen_dimensions.height
         }
 
-        if let Some(player) = player {
+        if let Some(_) = player {
             // If this entity is the player, apply a "braking force" on its velocity, so it slows down
             // over time, and cannot accelerate infinitely
             velocity.velocity *= 0.98;
@@ -71,11 +71,6 @@ pub fn destroy_timed_entities(objects: &mut Query<(Entity, &TimedExistenceCompon
     }
 }
 
-#[system(for_each)]
-pub fn test(col_comp: &mut CollisionComponent, bullet: &BulletComponent) {
-    print!("Found a bullet");
-}
-
 #[system]
 #[read_component(BulletComponent)]
 #[read_component(AsteroidComponent)]
@@ -98,7 +93,7 @@ pub fn handle_bullet_collisions(cmd: &mut CommandBuffer, world: &mut SubWorld, #
                 if asteroid.is_large {
                     // If this was a large asteroid, spawn a random number of smaller asteroids
                     let mut rng = rand::thread_rng();
-                    for _ in 2..rng.gen_range(3..=8) {
+                    for _ in 2..rng.gen_range(3..=10) {
                         let rotation = rng.gen_range(-10.0..=10.0);
                         let pos = asteroid_drawable.position;
                         if let Some(tex_uuid) = texture_map.mapping.get("small_asteroid") {

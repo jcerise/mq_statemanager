@@ -12,7 +12,7 @@ use rand::Rng;
 use uuid::Uuid;
 use crate::components::{AsteroidComponent, CollisionComponent, DrawableComponent, PlayerComponent, VelocityComponent};
 use crate::input::{ControlSet, GamePlayControls, InputManaged, InputManager, MainMenuControls};
-use crate::systems::{apply_velocity_system, destroy_timed_entities_system, handle_bullet_collisions_system, rotate_asteroids_system, test_system};
+use crate::systems::{apply_velocity_system, destroy_timed_entities_system, handle_bullet_collisions_system, rotate_asteroids_system};
 
 #[derive(Clone)]
 enum GameState {
@@ -145,7 +145,7 @@ async fn main() {
     );
 
     // Add eight large asteroids, and set them moving in random directions, at random velocity
-    for _ in 0..8 {
+    for _ in 0..12 {
         let rotation = rng.gen_range(-10.0..=10.0);
         let pos = Vec2::new(rng.gen_range(0.0..=screen_width()), rng.gen_range(0.0..=screen_height()));
         let tex_uuid = large_asteroid_textures.choose().unwrap();
