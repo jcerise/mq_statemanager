@@ -81,6 +81,22 @@ impl ControlSet for MainMenuControls {
     }
 }
 
+pub struct GameOverControls;
+
+impl ControlSet for GameOverControls {
+    fn execute_action(&mut self, actions: Vec<Action>, world: &mut World, texture_map: &TextureMap) -> Option<GameState> {
+        for action in actions.iter() {
+            match action {
+                Action::Revert => {
+                    return Some(GameState::MainMenu)
+                }
+                _ =>  return None
+            }
+        }
+        None
+    }
+}
+
 pub struct GamePlayControls;
 
 impl ControlSet for GamePlayControls {

@@ -9,10 +9,11 @@ use legion::{IntoQuery, Resources, Schedule, World};
 use macroquad::prelude::*;
 use macroquad::rand::ChooseRandom;
 use rand::Rng;
+use rand::rngs::ThreadRng;
 use uuid::Uuid;
 use crate::components::{AsteroidComponent, CollisionComponent, DrawableComponent, PlayerComponent, ScoreComponent, VelocityComponent};
-use crate::input::{ControlSet, GamePlayControls, InputManaged, InputManager, MainMenuControls};
-use crate::systems::{apply_velocity_system, destroy_timed_entities_system, handle_bullet_collisions_system, rotate_asteroids_system};
+use crate::input::{ControlSet, GameOverControls, GamePlayControls, InputManaged, InputManager, MainMenuControls};
+use crate::systems::{apply_velocity_system, destroy_timed_entities_system, handle_bullet_collisions_system, handle_player_collision_system, rotate_asteroids_system};
 
 #[derive(Clone)]
 enum GameState {
@@ -27,7 +28,7 @@ impl GameState {
         match *self {
             GameState::MainMenu => Box::new(MainMenuControls),
             GameState::GamePlay => Box::new(GamePlayControls),
-            GameState::GameOver => Box::new(MainMenuControls),
+            GameState::GameOver => Box::new(GameOverControls),
             GameState::Pause => Box::new(MainMenuControls)
 
         }
@@ -71,6 +72,10 @@ pub struct TimeResource {
 
 pub struct ScoreResource {
     score: i32
+}
+
+pub struct GameOverResource {
+    game_over: bool
 }
 
 #[derive(Clone)]
@@ -130,43 +135,8 @@ async fn main() {
     large_asteroid_textures.push(large_asteroid2_texture_id);
     large_asteroid_textures.push(large_asteroid3_texture_id);
 
-    // Create our legion world, and any shared resources our systems will need
-    let mut world = World::default();
-    let mut resources = Resources::default();
-    resources.insert(ScreenDimensions{width: screen_width(), height: screen_height()});
-    resources.insert(texture_map.clone());
-    resources.insert(TimeResource{absolute_time: get_time()});
-    resources.insert(ScoreResource{score: 0});
-
-    // Load our player entity into the world
-    let ship_position = Vec2::new(screen_width() / 2., screen_height() / 2.);
-    world.push(
-        (
-            PlayerComponent{last_bullet_fired: 0.0, fire_rate: 0.2},
-            DrawableComponent{texture_id: ship_texture_id, position: ship_position, rotation: 0.0},
-            VelocityComponent{velocity: Vec2::new(0.0, 0.0)},
-            CollisionComponent{rect: Rect::new(ship_position[0], ship_position[1], 16., 16.), collided: false},
-        )
-    );
-
-    // Add eight large asteroids, and set them moving in random directions, at random velocity
-    for _ in 0..12 {
-        let rotation = rng.gen_range(-10.0..=10.0);
-        let pos = Vec2::new(rng.gen_range(0.0..=screen_width()), rng.gen_range(0.0..=screen_height()));
-        let tex_uuid = large_asteroid_textures.choose().unwrap();
-
-        world.push(
-            (
-                AsteroidComponent{is_large: true},
-                DrawableComponent{texture_id: *tex_uuid, position: pos, rotation: rotation},
-                VelocityComponent{velocity: Vec2::from_angle(rotation) * rng.gen_range(0.1..=1.0)},
-                CollisionComponent{rect: Rect::new(pos[0], pos[1], 16., 16.), collided: false},
-                ScoreComponent{value: 5},
-            )
-        );
-    }
-
     // Init our game manager to the main menu state, the previous state will also reflect this
+    let (world, resources) = new_game(&mut rng, &texture_map, &large_asteroid_textures);
     let mut game_manager = GameStateManager{
         current_state: GameState::MainMenu,
         previous_state: GameState::MainMenu,
@@ -182,6 +152,7 @@ async fn main() {
         .add_system(rotate_asteroids_system())
         .add_system(destroy_timed_entities_system())
         .add_system(handle_bullet_collisions_system())
+        .add_system(handle_player_collision_system())
         .build();
 
     loop {
@@ -286,6 +257,68 @@ async fn main() {
             }
         }
 
+        // Check if the player has lost (ship collided with an asteroid)
+        let game_over = {
+            if let Some(game_over_resource) = game_manager.resources.get::<GameOverResource>() {
+                game_over_resource.game_over
+            } else {
+                false
+            }
+        };
+
+        if game_over {
+            game_manager.update_state(GameState::GameOver);
+
+            // Reset the state of the game world
+            let (world, resources) = new_game(&mut rng, &texture_map, &large_asteroid_textures);
+            game_manager.world = world;
+            game_manager.resources = resources;
+
+        }
+
         next_frame().await;
     }
+}
+
+fn new_game(rng: &mut ThreadRng, texture_map: &TextureMap, large_asteroid_textures: &Vec<Uuid>) -> (World, Resources) {
+    // Create our legion world, and any shared resources our systems will need
+    let mut world = World::default();
+
+    let mut resources = Resources::default();
+    resources.insert(ScreenDimensions{width: screen_width(), height: screen_height()});
+    resources.insert(texture_map.clone());
+    resources.insert(TimeResource{absolute_time: get_time()});
+    resources.insert(ScoreResource{score: 0});
+    resources.insert(GameOverResource{game_over: false});
+
+    // Load our player entity into the world
+    let ship_position = Vec2::new(screen_width() / 2., screen_height() / 2.);
+    let ship_texture_id = texture_map.mapping.get("ship").unwrap();
+    world.push(
+        (
+            PlayerComponent{last_bullet_fired: 0.0, fire_rate: 0.2},
+            DrawableComponent{texture_id: *ship_texture_id, position: ship_position, rotation: 0.0},
+            VelocityComponent{velocity: Vec2::new(0.0, 0.0)},
+            CollisionComponent{rect: Rect::new(ship_position[0], ship_position[1], 16., 16.), collided: false},
+        )
+    );
+
+    // Add eight large asteroids, and set them moving in random directions, at random velocity
+    for _ in 0..12 {
+        let rotation = rng.gen_range(-10.0..=10.0);
+        let pos = Vec2::new(rng.gen_range(0.0..=screen_width()), rng.gen_range(0.0..=screen_height()));
+        let tex_uuid = large_asteroid_textures.choose().unwrap();
+
+        world.push(
+            (
+                AsteroidComponent{is_large: true},
+                DrawableComponent{texture_id: *tex_uuid, position: pos, rotation: rotation},
+                VelocityComponent{velocity: Vec2::from_angle(rotation) * rng.gen_range(0.1..=1.0)},
+                CollisionComponent{rect: Rect::new(pos[0], pos[1], 16., 16.), collided: false},
+                ScoreComponent{value: 5},
+            )
+        );
+    }
+
+    (world, resources)
 }

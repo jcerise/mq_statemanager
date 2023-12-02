@@ -4,7 +4,7 @@ use legion::world::SubWorld;
 use macroquad::math::{Rect, Vec2};
 use rand::Rng;
 use crate::components::{AsteroidComponent, BulletComponent, CollisionComponent, DrawableComponent, PlayerComponent, ScoreComponent, TimedExistenceComponent, VelocityComponent};
-use crate::{ScoreResource, ScreenDimensions, TextureMap, TimeResource};
+use crate::{GameOverResource, ScoreResource, ScreenDimensions, TextureMap, TimeResource};
 
 #[system(for_each)]
 pub fn apply_velocity(velocity: &mut VelocityComponent,
@@ -117,4 +117,21 @@ pub fn handle_bullet_collisions(cmd: &mut CommandBuffer, world: &mut SubWorld, #
     }
 }
 
-
+#[system]
+#[read_component(PlayerComponent)]
+#[read_component(AsteroidComponent)]
+#[read_component(CollisionComponent)]
+pub fn handle_player_collision(world: &mut SubWorld, #[resource] game_over_resource: &mut GameOverResource) {
+    // Check each astroid against the player, to see if there are any collisions
+    // Again, ineffecient, but this is a small game, and it shouldn't matter
+    let (mut player_world, mut asteroid_world) = world.split::<(&PlayerComponent, &CollisionComponent)>();
+    let mut player_query = <(&PlayerComponent, &CollisionComponent)>::query();
+    for (_, player_collision) in player_query.iter_mut(&mut player_world) {
+        let mut asteroid_query = <(&CollisionComponent, &AsteroidComponent)>::query();
+        for (asteroid_collision, asteroid) in asteroid_query.iter_mut(&mut asteroid_world) {
+            if player_collision.rect.overlaps(&asteroid_collision.rect) {
+                game_over_resource.game_over = true;
+            }
+        }
+    }
+}
