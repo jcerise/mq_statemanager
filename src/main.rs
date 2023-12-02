@@ -155,6 +155,8 @@ async fn main() {
         .add_system(handle_player_collision_system())
         .build();
 
+    let mut final_score = 0;
+
     loop {
         clear_background(BLACK);
 
@@ -194,6 +196,9 @@ async fn main() {
                     });
             }
             GameState::GamePlay => {
+                // If we got after a previous game ending, reset everything
+
+
                 // Execute all systems
                 schedule.execute(&mut game_manager.world, &mut game_manager.resources);
 
@@ -233,27 +238,25 @@ async fn main() {
             GameState::Pause => {}
             GameState::GameOver => {
                 let title = "GAME OVER";
-                if let Some(score_resource) = game_manager.resources.get::<ScoreResource>() {
-                    draw_text_ex(
-                        title,
-                        screen_width() / 2. - measure_text(title, None, 50, 1.0).width / 2.0,
-                        screen_height() / 2.,
-                        TextParams{
-                            font_size: 50,
-                            color: WHITE,
-                            ..Default::default()
-                        });
-                    let score_text = format!("Your score was: {}", score_resource.score.to_string());
-                    draw_text_ex(
-                        &score_text,
-                        screen_width() / 2. - measure_text(&score_text, None, 30, 1.0).width / 2.0,
-                        screen_height() / 2. + 50.,
-                        TextParams{
-                            font_size: 30,
-                            color: WHITE,
-                            ..Default::default()
-                        });
-                }
+                draw_text_ex(
+                    title,
+                    screen_width() / 2. - measure_text(title, None, 50, 1.0).width / 2.0,
+                    screen_height() / 2.,
+                    TextParams{
+                        font_size: 50,
+                        color: WHITE,
+                        ..Default::default()
+                    });
+                let score_text = format!("Your score was: {}", final_score.to_string());
+                draw_text_ex(
+                    &score_text,
+                    screen_width() / 2. - measure_text(&score_text, None, 30, 1.0).width / 2.0,
+                    screen_height() / 2. + 50.,
+                    TextParams{
+                        font_size: 30,
+                        color: WHITE,
+                        ..Default::default()
+                    });
             }
         }
 
@@ -268,12 +271,12 @@ async fn main() {
 
         if game_over {
             game_manager.update_state(GameState::GameOver);
+             //  Set the final score, and reset everything
+            final_score = game_manager.resources.get::<ScoreResource>().unwrap().score;
 
-            // Reset the state of the game world
             let (world, resources) = new_game(&mut rng, &texture_map, &large_asteroid_textures);
             game_manager.world = world;
             game_manager.resources = resources;
-
         }
 
         next_frame().await;
