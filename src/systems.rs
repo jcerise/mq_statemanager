@@ -3,8 +3,8 @@ use legion::systems::CommandBuffer;
 use legion::world::SubWorld;
 use macroquad::math::{Rect, Vec2};
 use rand::Rng;
-use crate::components::{AsteroidComponent, BulletComponent, CollisionComponent, DrawableComponent, PlayerComponent, TimedExistenceComponent, VelocityComponent};
-use crate::{ScreenDimensions, TextureMap, TimeResource};
+use crate::components::{AsteroidComponent, BulletComponent, CollisionComponent, DrawableComponent, PlayerComponent, ScoreComponent, TimedExistenceComponent, VelocityComponent};
+use crate::{ScoreResource, ScreenDimensions, TextureMap, TimeResource};
 
 #[system(for_each)]
 pub fn apply_velocity(velocity: &mut VelocityComponent,
@@ -76,19 +76,22 @@ pub fn destroy_timed_entities(objects: &mut Query<(Entity, &TimedExistenceCompon
 #[read_component(AsteroidComponent)]
 #[read_component(CollisionComponent)]
 #[read_component(DrawableComponent)]
-pub fn handle_bullet_collisions(cmd: &mut CommandBuffer, world: &mut SubWorld, #[resource] texture_map: &TextureMap) {
+#[read_component(ScoreComponent)]
+pub fn handle_bullet_collisions(cmd: &mut CommandBuffer, world: &mut SubWorld, #[resource] texture_map: &TextureMap, #[resource] score_resource: &mut ScoreResource) {
     // Iterate through every bullet, and then every asteroid, to see if there are any collisions
     // This is inefficient, but for such a small game, is just fine
     let (mut bullet_world, mut asteroid_world) = world.split::<(&BulletComponent, &CollisionComponent)>();
     let mut bullet_query = <(Entity, &BulletComponent, &CollisionComponent)>::query();
     for (bullet_entity, _, bullet_collision) in bullet_query.iter_mut(&mut bullet_world) {
-        let mut asteroid_query = <(Entity, &CollisionComponent, &AsteroidComponent, &DrawableComponent)>::query();
-        for (asteroid_entity, asteroid_collision, asteroid, asteroid_drawable) in asteroid_query.iter_mut(&mut asteroid_world) {
+        let mut asteroid_query = <(Entity, &CollisionComponent, &AsteroidComponent, &DrawableComponent, &ScoreComponent)>::query();
+        for (asteroid_entity, asteroid_collision, asteroid, asteroid_drawable, score) in asteroid_query.iter_mut(&mut asteroid_world) {
             if bullet_collision.rect.overlaps(&asteroid_collision.rect) {
-                println!("Collided!");
                 // If this entity overlaps with the current entity, add both for removal
                 cmd.remove(*bullet_entity);
                 cmd.remove(*asteroid_entity);
+
+                // Update the score based on the size of the asteroid
+                score_resource.score += score.value;
 
                 if asteroid.is_large {
                     // If this was a large asteroid, spawn a random number of smaller asteroids
@@ -103,6 +106,7 @@ pub fn handle_bullet_collisions(cmd: &mut CommandBuffer, world: &mut SubWorld, #
                                     DrawableComponent{texture_id: *tex_uuid, position: pos, rotation: rotation},
                                     VelocityComponent{velocity: Vec2::from_angle(rotation) * rng.gen_range(0.1..=1.0)},
                                     CollisionComponent{rect: Rect::new(pos[0], pos[1], 16., 16.), collided: false},
+                                    ScoreComponent{value: 10},
                                 )
                             );
                         }

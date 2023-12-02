@@ -26,6 +26,11 @@ pub struct CollisionComponent {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScoreComponent {
+    pub value: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PlayerComponent {
     pub fire_rate: f64,
     pub last_bullet_fired: f64

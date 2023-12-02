@@ -132,6 +132,8 @@ impl ControlSet for GamePlayControls {
                     let mut bullet_fired = false;
                     for pending_entity in pending_entities.iter() {
                         bullet_fired = true;
+                        // I don't like this...but if we try and create the entity on the world in the loop above, the borrow checker rightfully complains
+                        // TODO: Find a better way to do this
                         world.push((pending_entity.0.clone(), pending_entity.1.clone(), pending_entity.2.clone(), pending_entity.3.clone(), pending_entity.4.clone()));
                     }
                     if bullet_fired {

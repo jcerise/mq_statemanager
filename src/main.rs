@@ -10,7 +10,7 @@ use macroquad::prelude::*;
 use macroquad::rand::ChooseRandom;
 use rand::Rng;
 use uuid::Uuid;
-use crate::components::{AsteroidComponent, CollisionComponent, DrawableComponent, PlayerComponent, VelocityComponent};
+use crate::components::{AsteroidComponent, CollisionComponent, DrawableComponent, PlayerComponent, ScoreComponent, VelocityComponent};
 use crate::input::{ControlSet, GamePlayControls, InputManaged, InputManager, MainMenuControls};
 use crate::systems::{apply_velocity_system, destroy_timed_entities_system, handle_bullet_collisions_system, rotate_asteroids_system};
 
@@ -67,6 +67,10 @@ pub struct ScreenDimensions {
 
 pub struct TimeResource {
     absolute_time: f64
+}
+
+pub struct ScoreResource {
+    score: i32
 }
 
 #[derive(Clone)]
@@ -126,12 +130,13 @@ async fn main() {
     large_asteroid_textures.push(large_asteroid2_texture_id);
     large_asteroid_textures.push(large_asteroid3_texture_id);
 
-    // Create our legion world
+    // Create our legion world, and any shared resources our systems will need
     let mut world = World::default();
     let mut resources = Resources::default();
     resources.insert(ScreenDimensions{width: screen_width(), height: screen_height()});
     resources.insert(texture_map.clone());
     resources.insert(TimeResource{absolute_time: get_time()});
+    resources.insert(ScoreResource{score: 0});
 
     // Load our player entity into the world
     let ship_position = Vec2::new(screen_width() / 2., screen_height() / 2.);
@@ -156,6 +161,7 @@ async fn main() {
                 DrawableComponent{texture_id: *tex_uuid, position: pos, rotation: rotation},
                 VelocityComponent{velocity: Vec2::from_angle(rotation) * rng.gen_range(0.1..=1.0)},
                 CollisionComponent{rect: Rect::new(pos[0], pos[1], 16., 16.), collided: false},
+                ScoreComponent{value: 5},
             )
         );
     }
@@ -181,6 +187,7 @@ async fn main() {
     loop {
         clear_background(BLACK);
 
+        // Update the time resource on each tick
         game_manager.resources.remove::<TimeResource>();
         game_manager.resources.insert(TimeResource{absolute_time:get_time()});
 
@@ -194,7 +201,7 @@ async fn main() {
 
         match game_manager.current_state {
             GameState::MainMenu => {
-                let title = "MQ State Management";
+                let title = "MQ Asteroids";
                 let instructions = "Press <ENTER> to start";
                 draw_text_ex(
                     title,
@@ -237,9 +244,46 @@ async fn main() {
 
                     draw_texture_ex(&texture_assets.get(&data.texture).unwrap(), data.position.x, data.position.y, WHITE, draw_params);
                 }
+
+                // Draw the players score to the top of the screen
+                if let Some(score_resource) = game_manager.resources.get::<ScoreResource>() {
+                    let score_text = format!("{}", score_resource.score.to_string());
+                    draw_text_ex(
+                        &score_text,
+                        screen_width() / 2. - measure_text(&score_text, None, 50, 1.0).width / 2.0,
+                        measure_text(&score_text, None, 50, 1.0).height + 5.0,
+                        TextParams{
+                            font_size: 50,
+                            color: WHITE,
+                            ..Default::default()
+                        });
+                }
             }
             GameState::Pause => {}
-            GameState::GameOver => {}
+            GameState::GameOver => {
+                let title = "GAME OVER";
+                if let Some(score_resource) = game_manager.resources.get::<ScoreResource>() {
+                    draw_text_ex(
+                        title,
+                        screen_width() / 2. - measure_text(title, None, 50, 1.0).width / 2.0,
+                        screen_height() / 2.,
+                        TextParams{
+                            font_size: 50,
+                            color: WHITE,
+                            ..Default::default()
+                        });
+                    let score_text = format!("Your score was: {}", score_resource.score.to_string());
+                    draw_text_ex(
+                        &score_text,
+                        screen_width() / 2. - measure_text(&score_text, None, 30, 1.0).width / 2.0,
+                        screen_height() / 2. + 50.,
+                        TextParams{
+                            font_size: 30,
+                            color: WHITE,
+                            ..Default::default()
+                        });
+                }
+            }
         }
 
         next_frame().await;
