@@ -12,7 +12,7 @@ use rand::Rng;
 use rand::rngs::ThreadRng;
 use uuid::Uuid;
 use crate::components::{AsteroidComponent, CollisionComponent, DrawableComponent, PlayerComponent, ScoreComponent, VelocityComponent};
-use crate::input::{ControlSet, GameOverControls, GamePlayControls, InputManaged, InputManager, MainMenuControls};
+use crate::input::{ControlSet, GameOverControls, GamePlayControls, InputManaged, InputManager, MainMenuControls, PauseControls};
 use crate::systems::{apply_velocity_system, destroy_timed_entities_system, handle_bullet_collisions_system, handle_player_collision_system, rotate_asteroids_system};
 
 #[derive(Clone)]
@@ -29,7 +29,7 @@ impl GameState {
             GameState::MainMenu => Box::new(MainMenuControls),
             GameState::GamePlay => Box::new(GamePlayControls),
             GameState::GameOver => Box::new(GameOverControls),
-            GameState::Pause => Box::new(MainMenuControls)
+            GameState::Pause => Box::new(PauseControls),
 
         }
     }
@@ -235,7 +235,18 @@ async fn main() {
                         });
                 }
             }
-            GameState::Pause => {}
+            GameState::Pause => {
+                let title = "Game Paused";
+                draw_text_ex(
+                    title,
+                    screen_width() / 2. - measure_text(title, None, 50, 1.0).width / 2.0,
+                    screen_height() / 2.,
+                    TextParams{
+                        font_size: 50,
+                        color: WHITE,
+                        ..Default::default()
+                    });
+            }
             GameState::GameOver => {
                 let title = "GAME OVER";
                 draw_text_ex(

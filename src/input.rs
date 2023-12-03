@@ -16,6 +16,7 @@ pub(crate) trait ControlSet {
 pub enum Action {
     Confirm,
     Revert,
+    Pause,
     RotateShipRight,
     RotateShipLeft,
     ThrustShip,
@@ -36,6 +37,9 @@ impl InputManaged for InputManager {
         if is_key_down(KeyCode::Escape) {
             keys.push(KeyCode::Escape)
         }
+        if is_key_down(KeyCode::P) {
+            keys.push(KeyCode::P)
+        }
         if is_key_down(KeyCode::Left) {
             keys.push(KeyCode::Left)
         }
@@ -54,6 +58,7 @@ impl InputManaged for InputManager {
             match key_code {
                 KeyCode::Enter => actions.push(Action::Confirm),
                 KeyCode::Escape => actions.push(Action::Revert),
+                KeyCode::P => actions.push(Action::Pause),
                 KeyCode::Right => actions.push(Action::RotateShipRight),
                 KeyCode::Left => actions.push(Action::RotateShipLeft),
                 KeyCode::Up => actions.push(Action::ThrustShip),
@@ -68,6 +73,22 @@ impl InputManaged for InputManager {
 pub struct MainMenuControls;
 
 impl ControlSet for MainMenuControls {
+    fn execute_action(&mut self, actions: Vec<Action>, world: &mut World, texture_map: &TextureMap) -> Option<GameState> {
+        for action in actions.iter() {
+            match action {
+                Action::Confirm => {
+                    return Some(GameState::GamePlay)
+                }
+                _ =>  return None
+            }
+        }
+        None
+    }
+}
+
+pub struct PauseControls;
+
+impl ControlSet for PauseControls {
     fn execute_action(&mut self, actions: Vec<Action>, world: &mut World, texture_map: &TextureMap) -> Option<GameState> {
         for action in actions.iter() {
             match action {
@@ -107,6 +128,9 @@ impl ControlSet for GamePlayControls {
                 Action::Revert => {
                     return_state = Some(GameState::MainMenu);
                 },
+                Action::Pause => {
+                    return_state = Some(GameState::Pause);
+                }
                 Action::RotateShipRight => {
                     let mut query = <(Write<DrawableComponent>, Read<PlayerComponent>)>::query();
                     for (drawable, _) in query.iter_mut(world) {
